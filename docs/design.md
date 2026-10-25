@@ -101,7 +101,7 @@
 rag-know-engine/
 ├── pyproject.toml
 ├── docker-compose.yml          # postgres / elasticsearch(+IK) / minio
-├── .env.example
+├── .env                        # 本地配置，不提交（变量见 README）
 ├── alembic/                    # 表结构迁移
 ├── docs/design.md
 ├── prompts/                    # 从 Java 版 resources/prompts 原样拷贝

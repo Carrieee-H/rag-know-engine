@@ -1,5 +1,5 @@
 # Local infrastructure for know-engine: PostgreSQL, Elasticsearch (+IK) and MinIO.
-# Usage: cp .env.example .env && docker compose up -d
+# Usage: docker compose up -d   (optional overrides such as PG_PASSWORD come from .env, see README)
 #
 # Images avoid Docker Hub, which is unreachable from this machine's Docker VM:
 # Postgres comes from AWS ECR's mirror of the official image, and MinIO from Chainguard
