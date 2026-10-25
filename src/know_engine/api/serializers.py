@@ -1,4 +1,4 @@
-"""JSON shapes matching the Java version's Jackson output, which the static pages depend on.
+"""JSON shapes the static pages depend on.
 
 Field names are camelCase; ``extension`` and segment ``metadata`` are JSON strings and
 ``skipEmbedding`` is 0/1, because the pages call JSON.parse / compare with 1.
@@ -77,7 +77,7 @@ def segment(s: KnowledgeSegment | None) -> dict | None:
 
 
 def page(records: list[dict], total: int, current: int, size: int) -> dict:
-    """MyBatis-Plus Page shape."""
+    """Paged result: records, total, size, current, pages."""
     return {
         "records": records,
         "total": total,

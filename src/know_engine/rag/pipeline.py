@@ -28,8 +28,8 @@ NO_CONTEXT = "(无检索上下文)"
 
 @dataclass
 class RagConfig:
-    # Defaults are the tuned values (rounds R1-R6 in docs/design.md). The Java first-release
-    # baseline (R0) was: original rewrite prompt, top_k 5/5, rerank_min_score 0.6, no fallback,
+    # Defaults are the tuned values (rounds R1-R6 in docs/design.md). The initial baseline
+    # (R0) was: original rewrite prompt, top_k 5/5, rerank_min_score 0.6, no fallback,
     # reranking the parent text.
     use_rewrite: bool = True
     rewrite_prompt: str = "query-rewrite-v2-prompt.txt"  # R4: keeps entities / codes / status words
@@ -117,7 +117,7 @@ def rank_candidates(query: str, vector_hits: list[Candidate], keyword_hits: list
 
 
 def build_messages(question: str, references: list[Candidate], history: list[tuple[str, str]] | None = None) -> list[dict]:
-    """System prompt + history + the question with the retrieved chunks injected (Java's ContentInjector)."""
+    """System prompt + history + the question with the retrieved chunks injected."""
     contents = "\n\n".join(c.text for c in references) or NO_CONTEXT
     user = llm.render(load_prompt("rag-content-injector-prompt.txt"), userMessage=question, contents=contents)
     messages = [{"role": "system", "content": load_prompt("generic-qa-prompt.txt")}]
@@ -137,7 +137,7 @@ def answer_stream(question: str, references: list[Candidate],
 
 
 def reference_dicts(retrieval: Retrieval) -> list[dict]:
-    """Shape of chat_message.rag_references, same fields as the Java RagReference."""
+    """Shape of chat_message.rag_references."""
     return [
         {
             "documentId": str(c.doc_id),

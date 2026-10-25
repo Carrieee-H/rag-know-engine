@@ -1,6 +1,6 @@
 """Markdown header splitter with parent/child chunks (TITLE and SMART strategies).
 
-Port of the Java MarkdownHeaderParentTextSplitter:
+How it works:
 
 1. Blank lines are removed, then the text is cut at every header of level <= ``title_level``
    (headers inside fenced code blocks are ignored). Each section carries its header path as

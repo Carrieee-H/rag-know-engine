@@ -1,6 +1,6 @@
 """Evaluation datasets: JSONL files under data/eval.
 
-Paths from the Java page (``classpath:eval/datasets/x.jsonl``) map to ``data/eval/x.jsonl``.
+The report page's default path (``classpath:eval/datasets/x.jsonl``) maps to ``data/eval/x.jsonl``.
 """
 
 import json

@@ -21,7 +21,7 @@ def bigint_pk() -> Mapped[int]:
 
 
 class AuditMixin:
-    """Columns shared by every table, mirroring the Java version.
+    """Columns shared by every table.
 
     lock_version is mapped as SQLAlchemy's version counter (optimistic lock);
     deleted is the soft-delete flag.

@@ -1,13 +1,14 @@
 """Re-map the evaluation set's ground-truth chunk IDs onto the chunks currently in the database.
 
-The original dataset labels chunks by the Java run's chunk IDs. The Java SQL dump contains
-those chunks' text, so each old chunk is matched to the current chunks of the same document
+The dataset labels ground truth with chunk IDs from an earlier chunking of the documents.
+A SQL dump of that earlier chunk table (MySQL INSERT statements) contains their text, so each
+old chunk is matched to the current chunks of the same document
 by character 3-gram overlap: among the new chunks that overlap the old one, the chosen one
 maximizes (answer coverage + 0.5 * similarity to the old chunk).
 
 Rerun this whenever documents are re-split (chunk IDs change), then rerun the evaluation.
 
-    python scripts/relabel_eval.py --sql ../know-engine/src/main/resources/sql/know_engine.sql
+    python scripts/relabel_eval.py --sql path/to/old_chunks.sql
 """
 
 import argparse
@@ -23,7 +24,7 @@ from know_engine.db import session_scope
 from know_engine.models import KnowledgeDocument, KnowledgeSegment
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "eval"
-ORIGINAL = DATA / "original"  # datasets as shipped with the Java project, never modified
+ORIGINAL = DATA / "original"  # datasets with the original labels, never modified
 INSERT = re.compile(r"INSERT INTO `(\w+)` VALUES \((.*)\);$")
 SAME_CHUNK = 0.7  # 3-gram Jaccard above which two chunks are considered the same
 OVERLAPS = 0.3  # share of one chunk's 3-grams found in the other
@@ -55,7 +56,7 @@ def parse_values(raw: str) -> list:
     return values
 
 
-def load_java(sql_path: Path) -> tuple[dict[str, str], dict[str, str]]:
+def load_old_chunks(sql_path: Path) -> tuple[dict[str, str], dict[str, str]]:
     """Return (old chunk_id -> (doc_id, text)) and (old doc_id -> title prefix like '01')."""
     chunks, docs = {}, {}
     for line in sql_path.read_text(encoding="utf-8").splitlines():
@@ -100,13 +101,13 @@ def current_chunks() -> tuple[dict[str, list[tuple[str, str]]], dict[str, str]]:
     return by_prefix, doc_ids
 
 
-def relabel(case: dict, java_chunks, java_docs, new_chunks, new_doc_ids, stats) -> dict:
+def relabel(case: dict, old_chunks, old_docs, new_chunks, new_doc_ids, stats) -> dict:
     answer = grams(case.get("groundTruthAnswer") or "")
     question = grams(case["question"])
     new_ids, new_docs = [], []
     for old_id in case.get("groundTruthChunkIds") or []:
-        old_doc, old_text = java_chunks[old_id]
-        prefix = java_docs[old_doc]
+        old_doc, old_text = old_chunks[old_id]
+        prefix = old_docs[old_doc]
         old = grams(old_text)
         scored = []
         for chunk_id, text in new_chunks[prefix]:
@@ -145,13 +146,13 @@ def main() -> None:
     parser.add_argument("--sql", type=Path, required=True)
     args = parser.parse_args()
 
-    java_chunks, java_docs = load_java(args.sql)
+    old_chunks, old_docs = load_old_chunks(args.sql)
     new_chunks, new_doc_ids = current_chunks()
     stats = defaultdict(int)
 
     def relabel_file(name: str) -> list[dict]:
         lines = (ORIGINAL / name).read_text(encoding="utf-8").splitlines()
-        return [relabel(json.loads(line), java_chunks, java_docs, new_chunks, new_doc_ids, stats)
+        return [relabel(json.loads(line), old_chunks, old_docs, new_chunks, new_doc_ids, stats)
                 for line in lines if line.strip()]
 
     relabeled = relabel_file("eval-test-all.jsonl")

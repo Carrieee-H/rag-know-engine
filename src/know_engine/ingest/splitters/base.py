@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 
-# Metadata keys, kept identical to the Java version because the frontend reads them.
+# Metadata keys; camelCase because the frontend reads them.
 CHUNK_ID = "chunkId"
 PARENT_CHUNK_ID = "parentChunkId"
 SKIP_EMBEDDING = "skipEmbedding"
@@ -46,7 +46,6 @@ def merge_parts(parts: list[str], size: int, overlap: int, joiner: str) -> list[
 
     A part longer than ``size`` is cut into character windows. When a segment is closed,
     the next one starts with as many trailing parts of it as fit in ``overlap`` characters.
-    This approximates LangChain4j's DocumentByWordSplitter / DocumentByRegexSplitter.
     """
     if size <= 0:
         raise ValueError("chunkSize 必须大于 0")

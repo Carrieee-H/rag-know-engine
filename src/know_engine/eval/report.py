@@ -1,6 +1,6 @@
 """Read side of evaluation runs: report, run list, comparison and CSV export.
 
-JSON shapes follow the Java version, since eval-report.html renders them.
+JSON shapes are the ones eval-report.html renders.
 """
 
 import csv

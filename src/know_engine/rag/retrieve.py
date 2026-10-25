@@ -79,7 +79,7 @@ def keyword_search(query: str, top_k: int) -> list[Candidate]:
 
 def rrf_fuse(ranked_lists: list[list[Candidate]], k: int = 60) -> list[Candidate]:
     """Reciprocal Rank Fusion keyed by chunk_id; a chunk found by both retrievers is merged into one
-    candidate whose score adds up (the Java version needed a custom fuser for the same reason)."""
+    candidate whose score adds up and whose sources are merged."""
     fused: dict[str, Candidate] = {}
     for ranked in ranked_lists:
         for rank, candidate in enumerate(ranked, start=1):
@@ -133,7 +133,7 @@ def rerank(query: str, candidates: list[Candidate], min_score: float | None, top
     """Score with the BGE cross-encoder (sigmoid, 0..1), drop those below ``min_score``, keep ``top_n``.
 
     Returns (kept, used_fallback). With ``fallback``, an empty result falls back to the RRF order
-    instead of giving the LLM no context (the Java version's first release had no such guard).
+    instead of giving the LLM no context.
     """
     if not candidates:
         return [], False

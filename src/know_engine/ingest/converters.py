@@ -43,8 +43,7 @@ def raw_object_name(doc_id: int, version_id: int, file_name: str) -> str:
 
 
 def converted_prefix(doc_id: int, version_id: int) -> str:
-    # Per version, so a new version never overwrites the previous one's files
-    # (the Java version keyed this by document title).
+    # Per version, so a new version never overwrites the previous one's files.
     return f"converted/{doc_id}/{version_id}/"
 
 

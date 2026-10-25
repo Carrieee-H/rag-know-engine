@@ -139,7 +139,7 @@ def split(doc_id: int, params: SplitParams) -> int:
             raise ConflictError("文档没有可切分的版本")
         version = get_version(s, doc.current_version_id)
         if version.status == DocumentStatus.CHUNKED:
-            # Already split; same answer as the Java version (count of segments to embed).
+            # Already split: idempotent, answer with the number of segments to embed.
             return s.scalar(select(func.count()).select_from(KnowledgeSegment).where(
                 KnowledgeSegment.document_version == version.version_id, KnowledgeSegment.skip_embedding.is_(False)
             ))

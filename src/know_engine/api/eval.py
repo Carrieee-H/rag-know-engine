@@ -1,5 +1,4 @@
-"""/eval routes. Responses use the Java Result wrapper ({success, message, data, total})
-because eval-report.html reads it."""
+"""/eval routes. Responses use the {success, message, data, total} wrapper that eval-report.html reads."""
 
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import Response

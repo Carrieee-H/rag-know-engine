@@ -1,7 +1,6 @@
 """LENGTH, REGEX and SEPARATOR strategies.
 
-Sizes are in characters. (The Java tutorial describes LENGTH as counting words, but
-LangChain4j's DocumentByWordSplitter without a tokenizer also measures characters.)
+Sizes are in characters.
 """
 
 import re
@@ -17,7 +16,7 @@ def split_by_length(text: str, chunk_size: int, overlap: int) -> list[Chunk]:
 def split_by_regex(text: str, pattern: str, chunk_size: int, overlap: int) -> list[Chunk]:
     """Cut at matches of ``pattern``, then pack the pieces up to ``chunk_size`` characters.
 
-    SEPARATOR uses this too: as in the Java version, the separator is interpreted as a regex.
+    SEPARATOR uses this too: the separator is interpreted as a regex.
     """
     if not pattern:
         raise ValueError("REGEX / SEPARATOR 切分需要提供正则表达式或分隔符")

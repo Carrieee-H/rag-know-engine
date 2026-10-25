@@ -39,7 +39,7 @@ def recognize_intent(question: str) -> Intent:
 
 
 def format_history(history: list[tuple[str, str]]) -> str:
-    """Same format as the Java QueryTransformer: ``User: ...`` / ``AI: ...`` lines."""
+    """``User: ...`` / ``AI: ...`` lines."""
     return "\n".join(f"{'User' if role == 'USER' else 'AI'}: {text}" for role, text in history if text)
 
 

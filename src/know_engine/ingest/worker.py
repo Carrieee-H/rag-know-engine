@@ -1,12 +1,12 @@
 """State-driven ingest worker.
 
-Replaces both the Java version's Spring event (embed right after splitting) and its
-5-minute compensation job: the worker keeps polling for CHUNKED versions that are their
-document's current version, claims one with ``FOR UPDATE SKIP LOCKED`` and embeds it.
-Any number of workers can run at once without processing the same version twice.
+Embedding is driven by database state rather than by events: the worker keeps polling for
+CHUNKED versions that are their document's current version, claims one with
+``FOR UPDATE SKIP LOCKED`` and embeds it. Any number of workers can run at once without
+processing the same version twice, and a crash simply leaves the version CHUNKED for the next
+poll, so no separate compensation job is needed.
 
-Failures are retried with exponential backoff; after MAX_ATTEMPTS the version is marked
-FAILED (the Java job retried forever).
+Failures are retried with exponential backoff; after MAX_ATTEMPTS the version is marked FAILED.
 
 Run standalone with ``python -m know_engine.ingest.worker``; the API also starts one in-process.
 """

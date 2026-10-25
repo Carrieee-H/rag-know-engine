@@ -38,7 +38,7 @@ app.include_router(eval_api.router)
 
 # Errors come back as plain text: the pages show the response body as the message.
 @app.exception_handler(ConflictError)
-@app.exception_handler(ValueError)  # invalid input from splitters/converters, like Java's IllegalArgumentException
+@app.exception_handler(ValueError)  # invalid input from splitters / converters
 async def conflict(_: Request, e: ValueError):
     return PlainTextResponse(str(e), status_code=409)
 

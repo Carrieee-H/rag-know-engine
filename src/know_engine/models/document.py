@@ -59,7 +59,6 @@ class KnowledgeSegment(AuditMixin, Base):
     # sha256 of (embedding model, text): lets a new version reuse vectors of unchanged chunks.
     text_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     chunk_id: Mapped[str] = mapped_column(String(64), unique=True)
-    # varchar(2048) in the Java version, which could truncate; JSONB here.
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB)
     document_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("knowledge_document.doc_id", ondelete="CASCADE")

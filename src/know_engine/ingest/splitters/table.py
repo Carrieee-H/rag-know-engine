@@ -1,7 +1,6 @@
 """XLSX / CSV: one chunk per data row, written as ``header：value; header：value``.
 
-Same as the Java ExcelSplitter in key-value mode: only the first sheet is read and the
-first row is the header.
+Only the first sheet is read and the first row is the header.
 """
 
 import io

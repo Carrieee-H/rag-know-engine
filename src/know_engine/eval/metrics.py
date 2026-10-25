@@ -15,7 +15,7 @@ SCORE_JSON = re.compile(r"\{[^{}]*\"score\"[^{}]*\}", re.DOTALL)
 def retrieval_scores(retrieved_chunks: list[set[str]], retrieved_docs: list[str],
                      gt_chunks: list[str], gt_docs: list[str], top_k: int) -> dict | None:
     """Hit@K, MRR and Recall@K over the top-K references, at chunk level, or document level when
-    the case has no chunk ground truth (same rules as the Java RetrievalMetricCalculator).
+    the case has no chunk ground truth.
 
     Each reference is the set of chunk IDs whose text it carries (a parent reference covers every
     child folded into it). Returns None when the case has no ground truth.

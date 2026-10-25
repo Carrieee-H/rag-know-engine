@@ -1,4 +1,4 @@
-"""/api/document and /api/segment, same routes and parameters as the Java controllers."""
+"""/api/document and /api/segment: documents, versions, splitting and segments; ingest stats and lineage."""
 
 import mimetypes
 from urllib.parse import quote
@@ -177,7 +177,7 @@ def update_document(body: DocumentBody) -> bool:
 
 @router.delete("/api/document/batch")
 def delete_batch(ids: list[str] = Query(...)) -> bool:
-    # Accept both ?ids=1,2 (Spring style, used by the page) and ?ids=1&ids=2.
+    # Accept both ?ids=1,2 (used by the page) and ?ids=1&ids=2.
     doc_ids = [int(x) for item in ids for x in item.split(",") if x.strip()]
     return service.delete_documents(doc_ids)
 

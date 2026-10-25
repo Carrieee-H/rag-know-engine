@@ -16,7 +16,7 @@ def clean(text: str | None) -> str:
 
 
 def render(template: str, **values: str) -> str:
-    """Fill ``{{name}}`` placeholders (the Java prompt files use this syntax)."""
+    """Fill ``{{name}}`` placeholders used by the prompt files."""
     for name, value in values.items():
         template = template.replace("{{" + name + "}}", value)
     return template

@@ -5,7 +5,7 @@ from know_engine.ingest.reindex import _next_name
 from know_engine.rag.pipeline import RagConfig
 
 
-def test_sse_framing_matches_spring():
+def test_sse_framing():
     frames = list(sse(["[PROGRESS]:正在检索", "第一行\n第二行", ""]))
     assert frames[0] == "data:[PROGRESS]:正在检索\n\n"
     # A multi-line payload becomes several data: lines in one event (the page joins them with \n).

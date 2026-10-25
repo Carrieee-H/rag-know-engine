@@ -1,4 +1,4 @@
-"""/chat routes, same as the Java ChatController / ChatConversationController / ChatMessageController."""
+"""/chat routes: streaming chat, conversation list / delete, message history."""
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -9,7 +9,7 @@ router = APIRouter(prefix="/chat")
 
 
 def sse(payloads):
-    """Spring's text/event-stream framing: one event per payload, one ``data:`` line per text line."""
+    """text/event-stream framing: one event per payload, one ``data:`` line per text line."""
     for payload in payloads:
         yield "".join(f"data:{line}\n" for line in payload.split("\n")) + "\n"
 

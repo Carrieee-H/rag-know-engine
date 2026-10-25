@@ -1,6 +1,6 @@
 """Streaming chat: conversation bookkeeping, intent routing, RAG and plain chat.
 
-``chat_events`` yields the SSE payloads the Java version produced, in the same order:
+``chat_events`` yields the SSE payloads in this order:
 progress messages, an optional ``[REFERENCE]:<json>``, answer tokens, then ``[DONE]:<conversationId>``.
 """
 

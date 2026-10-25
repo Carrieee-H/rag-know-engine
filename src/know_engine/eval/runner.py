@@ -1,7 +1,7 @@
 """Batch evaluation: run every case through the real RAG chain, score it, store the results.
 
-Like the Java version, inference skips intent recognition (every case is forced through
-retrieval) so the scores reflect the retrieval chain, not the router.
+Inference skips intent recognition (every case is forced through retrieval) so the scores
+reflect the retrieval chain, not the router.
 """
 
 import time

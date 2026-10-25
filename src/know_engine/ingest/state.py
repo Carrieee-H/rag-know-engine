@@ -2,8 +2,7 @@
 
 Every mutating operation on a document first locks its ``knowledge_document`` row:
 
-- API requests lock with NOWAIT, so a concurrent request fails fast with a conflict
-  (the Java version used Redisson locks with waitTime=0 for the same effect).
+- API requests lock with NOWAIT, so a concurrent request fails fast with a conflict.
 - The ingest worker locks with SKIP LOCKED and simply tries again later.
 
 Since nobody ever waits on a lock while holding another, this cannot deadlock.
