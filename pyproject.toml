@@ -1,0 +1,60 @@
+[project]
+name = "rag-know-engine"
+version = "0.1.0"
+description = "Document ingestion pipeline and RAG retrieval service (Python port of KnowEngine)"
+requires-python = ">=3.12"
+dependencies = [
+    # web
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "pydantic-settings>=2.4",
+    # storage
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "elasticsearch>=8.15,<9",  # client major version must match the ES server (8.x)
+    "minio>=7.2",
+    # models
+    "openai>=1.40",
+    "sentence-transformers>=3.0",  # local bge-reranker-base
+    # document parsing
+    "httpx>=0.27",
+    "pandas>=2.2",
+    "openpyxl>=3.1",
+    "python-docx>=1.1",
+    "pillow>=10.4",
+    # logging
+    "structlog>=24.1",
+]
+
+[project.optional-dependencies]
+orchestration = [
+    "dagster>=1.13,<1.14",
+    "dagster-webserver>=1.13,<1.14",
+]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/know_engine"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+# Broad catches are deliberate at the worker loop and best-effort cleanup points.
+ignore = ["BLE001"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/know_engine/api/*" = ["B008"]  # FastAPI's File()/Query() defaults
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

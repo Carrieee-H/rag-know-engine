@@ -1,0 +1,688 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 对话助手</title>
+    <!-- Markdown 渲染依赖：marked 解析 + DOMPurify 防 XSS + highlight.js 代码高亮 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/chat.css">
+</head>
+<body>
+    <div class="app-page app-page--fill">
+        <header class="app-nav">
+            <div class="app-brand">
+                <span class="brand-mark">KE</span>
+                <h1>AI 对话助手</h1>
+            </div>
+            <nav class="app-nav-links" aria-label="页面导航">
+                <a href="/upload.html" class="nav-link">上传文档</a>
+                <a href="/document.html" class="nav-link">文档管理</a>
+                <a href="/chat.html" class="nav-link is-active">AI 对话</a>
+            </nav>
+        </header>
+        <main class="app-main app-main--flush">
+            <div class="chat-layout">
+                <div class="sidebar">
+                    <div class="sidebar-header">
+                        <button class="btn btn-primary new-chat-btn" id="newChatBtn">新对话</button>
+                    </div>
+                    <div class="conversation-list" id="conversationList">
+                        <div class="no-conversations">暂无对话记录</div>
+                    </div>
+                </div>
+                <div class="chat-main">
+                    <div class="chat-header" id="chatHeader" style="display: none;">
+                        <h3 id="chatTitle">新对话</h3>
+                        <span class="conversation-id" id="conversationIdDisplay"></span>
+                    </div>
+
+                    <div class="messages-container" id="messagesContainer">
+                        <div class="welcome-message" id="welcomeMessage">
+                            <h2>欢迎使用 AI 对话助手</h2>
+                            <p>输入您的问题，开始与 AI 交流吧！</p>
+                        </div>
+                    </div>
+
+                    <div class="input-area">
+                        <div class="input-wrapper">
+                            <textarea id="messageInput" placeholder="输入您的问题..." rows="1"></textarea>
+                            <button class="btn btn-primary" id="sendBtn">发送</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 状态管理
+        let currentConversationId = null;
+        let isStreaming = false;
+        let eventSource = null;
+
+        // 配置 marked：开启 GFM、换行符转 <br>、代码高亮
+        if (window.marked) {
+            marked.setOptions({
+                gfm: true,
+                breaks: true,
+                highlight: function(code, lang) {
+                    if (window.hljs) {
+                        try {
+                            if (lang && hljs.getLanguage(lang)) {
+                                return hljs.highlight(code, { language: lang }).value;
+                            }
+                            return hljs.highlightAuto(code).value;
+                        } catch (e) { /* ignore */ }
+                    }
+                    return code;
+                }
+            });
+        }
+
+        // Markdown 渲染（先经 marked 解析，再用 DOMPurify 清理，防 XSS）
+        function renderMarkdown(text) {
+            if (text == null) return '';
+            const raw = String(text);
+            if (!window.marked) return escapeHtml(raw);
+            try {
+                const html = marked.parse(raw);
+                if (window.DOMPurify) {
+                    return DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
+                }
+                return html;
+            } catch (e) {
+                console.error('Markdown 渲染失败:', e);
+                return escapeHtml(raw);
+            }
+        }
+
+        // DOM 元素
+        const newChatBtn = document.getElementById('newChatBtn');
+        const conversationList = document.getElementById('conversationList');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const chatHeader = document.getElementById('chatHeader');
+        const chatTitle = document.getElementById('chatTitle');
+        const conversationIdDisplay = document.getElementById('conversationIdDisplay');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConversations();
+            setupEventListeners();
+        });
+
+        // 设置事件监听
+        function setupEventListeners() {
+            // 新对话按钮
+            newChatBtn.addEventListener('click', () => {
+                currentConversationId = null;
+                resetChat();
+            });
+
+            // 发送按钮
+            sendBtn.addEventListener('click', sendMessage);
+
+            // 回车发送
+            messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // 自动调整输入框高度
+            messageInput.addEventListener('input', () => {
+                messageInput.style.height = 'auto';
+                messageInput.style.height = Math.min(messageInput.scrollHeight, 150) + 'px';
+            });
+        }
+
+        // 加载会话列表
+        async function loadConversations() {
+            try {
+                const response = await fetch('/chat/conversation/list');
+                if (response.ok) {
+                    const result = await response.json();
+                    renderConversationList(result.data || []);
+                }
+            } catch (error) {
+                console.error('加载会话列表失败:', error);
+            }
+        }
+
+        // 渲染会话列表
+        function renderConversationList(conversations) {
+            if (!conversations || conversations.length === 0) {
+                conversationList.innerHTML = '<div class="no-conversations">暂无对话记录</div>';
+                return;
+            }
+
+            conversationList.innerHTML = conversations.map(conv => `
+                <div class="conversation-item ${conv.conversationId === currentConversationId ? 'active' : ''}" 
+                     data-id="${conv.conversationId}">
+                    <div class="title">${escapeHtml(conv.title || '新对话')}</div>
+                    <div class="time">${formatTime(conv.updateTime || conv.createTime)}</div>
+                    <button class="delete-btn" onclick="deleteConversation(event, '${conv.conversationId}')">删除</button>
+                </div>
+            `).join('');
+
+            // 添加点击事件
+            conversationList.querySelectorAll('.conversation-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-btn')) return;
+                    selectConversation(item.dataset.id);
+                });
+            });
+        }
+
+        // 选择会话
+        async function selectConversation(conversationId) {
+            currentConversationId = conversationId;
+            
+            // 更新UI选中状态
+            conversationList.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.id === conversationId);
+            });
+
+            // 加载消息历史
+            await loadMessages(conversationId);
+        }
+
+        // 加载消息历史
+        async function loadMessages(conversationId) {
+            try {
+                const response = await fetch(`/chat/message/list?conversationId=${encodeURIComponent(conversationId)}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    renderMessages(result.data || []);
+                    
+                    // 显示聊天头部
+                    const activeItem = conversationList.querySelector('.conversation-item.active');
+                    if (activeItem) {
+                        chatTitle.textContent = activeItem.querySelector('.title').textContent;
+                    }
+                    conversationIdDisplay.textContent = conversationId.substring(0, 8) + '...';
+                    chatHeader.style.display = 'flex';
+                    welcomeMessage.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('加载消息失败:', error);
+            }
+        }
+
+        // 渲染消息列表
+        function renderMessages(messages) {
+            if (!messages || messages.length === 0) {
+                messagesContainer.innerHTML = '<div class="welcome-message"><p>暂无消息记录</p></div>';
+                return;
+            }
+
+            messagesContainer.innerHTML = messages.map(msg => {
+                const refsHtml = msg.ragReferences && msg.ragReferences.length > 0
+                    ? buildReferencesHtml(msg.ragReferences)
+                    : '';
+                const isUser = msg.type === 'USER';
+                // AI 消息按 Markdown 渲染（支持图片等），用户消息保持原文转义
+                const bodyHtml = isUser
+                    ? escapeHtml(msg.content || '')
+                    : `<div class="markdown-body">${renderMarkdown(msg.content || '')}</div>`;
+                return `
+                    <div class="message ${isUser ? 'user' : 'assistant'}">
+                        <div class="message-avatar">${isUser ? 'U' : 'AI'}</div>
+                        <div class="message-content">
+                            <div class="message-text">${bodyHtml}</div>
+                            ${refsHtml}
+                            <div class="message-time">${formatTime(msg.createTime)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            scrollToBottom();
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const content = messageInput.value.trim();
+            if (!content || isStreaming) return;
+
+            // 显示用户消息
+            appendMessage('user', content);
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+
+            // 隐藏欢迎消息
+            welcomeMessage.style.display = 'none';
+            chatHeader.style.display = 'flex';
+
+            // 显示AI正在输入
+            const aiMessageElement = appendMessage('assistant', '', true);
+            aiMessageElement.progressSteps = [];
+            isStreaming = true;
+            sendBtn.disabled = true;
+
+            try {
+                // 构建URL
+                const params = new URLSearchParams();
+                params.append('content', content);
+                if (currentConversationId) {
+                    params.append('conversationId', currentConversationId);
+                }
+
+                // 使用fetch发送请求
+                const response = await fetch(`/chat/send?${params.toString()}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // 处理SSE流式响应
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let fullContent = '';
+                let hasSpecialContent = false; // 标记是否已渲染 WARN/CARD 等特殊内容
+
+                // 处理单个 SSE 事件（事件内可能包含多条 data: 行，需用 \n 拼接以保留 Markdown 换行）
+                const processEvent = (eventBlock) => {
+                    if (!eventBlock) return;
+                    const lines = eventBlock.split(/\r?\n/);
+                    const dataLines = [];
+                    let nonDataFallback = '';
+                    for (const ln of lines) {
+                        if (ln.startsWith('data:')) {
+                            // SSE 规范：data: 后允许有一个可选空格，但不应 trim 内容（保留缩进/列表前缀）
+                            let v = ln.substring(5);
+                            if (v.startsWith(' ')) v = v.substring(1);
+                            dataLines.push(v);
+                        } else if (ln.trim() && !ln.startsWith(':')) {
+                            // 兼容直接返回的非 SSE 文本（如裸 [DONE]:conversationId）
+                            nonDataFallback = ln.trim();
+                        }
+                    }
+
+                    if (dataLines.length === 0) {
+                        // 处理非 SSE 兜底：识别 [DONE]:conversationId
+                        if (nonDataFallback.startsWith('[DONE]:')) {
+                            const conversationId = nonDataFallback.substring(7).trim();
+                            if (conversationId) {
+                                currentConversationId = conversationId;
+                                conversationIdDisplay.textContent = conversationId.substring(0, 8) + '...';
+                                loadConversations();
+                            }
+                        }
+                        return;
+                    }
+
+                    // 关键：多条 data: 行用 \n 拼接，保留 Markdown 中的换行
+                    const data = dataLines.join('\n');
+
+                    // [DONE]:conversationId
+                    if (data.startsWith('[DONE]:')) {
+                        const conversationId = data.substring(7).trim();
+                        if (conversationId) {
+                            currentConversationId = conversationId;
+                            conversationIdDisplay.textContent = conversationId.substring(0, 8) + '...';
+                            loadConversations();
+                        }
+                        return;
+                    }
+                    if (data === '[DONE]') return;
+                    // 进度通知
+                    if (data.startsWith('[PROGRESS]:')) {
+                        updateProgressStatus(aiMessageElement, data.substring(11).trim());
+                        return;
+                    }
+                    // 引用资料
+                    if (data.startsWith('[REFERENCE]:')) {
+                        try {
+                            const refs = JSON.parse(data.substring(12).trim());
+                            aiMessageElement.references = refs;
+                            renderReferences(aiMessageElement, refs);
+                        } catch (e) {
+                            console.error('解析引用数据失败:', e);
+                        }
+                        return;
+                    }
+                    // 警告
+                    if (data.startsWith('[WARN]:')) {
+                        renderWarnMessage(aiMessageElement, data.substring(7).trim());
+                        hasSpecialContent = true;
+                        return;
+                    }
+                    // 卡片提示
+                    if (data.startsWith('[CARD]:')) {
+                        renderCardPrompt(aiMessageElement, data.substring(7).trim());
+                        hasSpecialContent = true;
+                        return;
+                    }
+
+                    // 普通内容：累积并渲染（收到首个内容时把最后一个进度标记为完成）
+                    if (fullContent === '') {
+                        markAllProgressDone(aiMessageElement);
+                    }
+                    fullContent += data;
+                    updateMessageContent(aiMessageElement, fullContent);
+                };
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // SSE 事件以空行（\n\n 或 \r\n\r\n）为分隔
+                    const eventSep = /\r?\n\r?\n/g;
+                    let m;
+                    let lastIndex = 0;
+                    while ((m = eventSep.exec(buffer)) !== null) {
+                        const eventBlock = buffer.substring(lastIndex, m.index);
+                        lastIndex = m.index + m[0].length;
+                        processEvent(eventBlock);
+                    }
+                    buffer = buffer.substring(lastIndex);
+                }
+
+                // 收尾：缓冲区里若仍有未以空行结束的事件，作为最后一个事件处理
+                if (buffer.trim()) {
+                    processEvent(buffer);
+                    buffer = '';
+                }
+
+                // 如果没有收到流式内容，也没有渲染过特殊内容（WARN/CARD），显示提示
+                if (!fullContent && !hasSpecialContent) {
+                    updateMessageContent(aiMessageElement, '对话已创建，请继续输入您的问题。');
+                }
+
+            } catch (error) {
+                console.error('发送消息失败:', error);
+                updateMessageContent(aiMessageElement, '发送失败: ' + error.message);
+            } finally {
+                isStreaming = false;
+                sendBtn.disabled = false;
+                removeTypingIndicator(aiMessageElement);
+                markAllProgressDone(aiMessageElement);
+                scrollToBottom();
+            }
+        }
+
+        // 添加消息到聊天区域
+        function appendMessage(type, content, showTyping = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            // AI 消息按 Markdown 渲染，用户消息保持转义
+            const bodyHtml = type === 'user'
+                ? escapeHtml(content)
+                : `<div class="markdown-body">${renderMarkdown(content)}</div>`;
+            messageDiv.innerHTML = `
+                <div class="message-avatar">${type === 'user' ? 'U' : 'AI'}</div>
+                <div class="message-content">
+                    <div class="message-text">${bodyHtml}${showTyping ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' : ''}</div>
+                    <div class="message-time">${new Date().toLocaleTimeString()}</div>
+                </div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+            return messageDiv;
+        }
+
+        // 更新消息内容
+        function updateMessageContent(messageElement, content) {
+            const textElement = messageElement.querySelector('.message-text');
+            if (textElement) {
+                // 保留打字指示器
+                const typingIndicator = textElement.querySelector('.typing-indicator');
+                const isAssistant = messageElement.classList.contains('assistant');
+                if (isAssistant) {
+                    // 流式过程中也按 Markdown 渲染（图片、代码块、表格等增量也能正确呈现）
+                    textElement.innerHTML = `<div class="markdown-body">${renderMarkdown(content)}</div>`;
+                } else {
+                    textElement.innerHTML = escapeHtml(content);
+                }
+                if (typingIndicator) {
+                    textElement.appendChild(typingIndicator);
+                }
+            }
+            scrollToBottom();
+        }
+
+        // 构建引用资料HTML
+        function buildReferencesHtml(references) {
+            if (!references || references.length === 0) return '';
+            const uniqueRefs = [];
+            const seen = new Set();
+            for (const ref of references) {
+                const key = (ref.documentTitle || '') + '|' + (ref.url || '');
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueRefs.push(ref);
+                }
+            }
+            return `
+                <div class="message-references">
+                    <div class="references-label">参考来源：</div>
+                    <div class="references-list">
+                        ${uniqueRefs.map((ref, idx) => `
+                            <a href="${ref.url || '#'}" target="_blank" class="reference-item" title="${escapeHtml(ref.documentTitle || '')}">
+                                <span class="reference-index">[${idx + 1}]</span>
+                                <span class="reference-title">${escapeHtml(ref.documentTitle || '未知文档')}</span>
+                            </a>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 渲染引用资料到消息元素
+        function renderReferences(messageElement, references) {
+            const contentEl = messageElement.querySelector('.message-content');
+            if (!contentEl) return;
+
+            // 移除已有的引用区域
+            const existingRefs = contentEl.querySelector('.message-references');
+            if (existingRefs) existingRefs.remove();
+
+            const refsHtml = buildReferencesHtml(references);
+            if (!refsHtml) return;
+
+            // 插入到 message-time 之前
+            const timeEl = contentEl.querySelector('.message-time');
+            if (timeEl) {
+                timeEl.insertAdjacentHTML('beforebegin', refsHtml);
+            } else {
+                contentEl.insertAdjacentHTML('beforeend', refsHtml);
+            }
+        }
+
+        // 移除打字指示器
+        function removeTypingIndicator(messageElement) {
+            const typingIndicator = messageElement.querySelector('.typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // 更新进度状态：依次展示所有进度，新进度到来时将上一个标记为已完成
+        function updateProgressStatus(messageElement, progressMsg) {
+            const contentEl = messageElement.querySelector('.message-content');
+            if (!contentEl) return;
+
+            // 移除打字指示器（如果存在）
+            removeTypingIndicator(messageElement);
+
+            const steps = messageElement.progressSteps || [];
+            // 将上一个进度标记为已完成
+            if (steps.length > 0) {
+                steps[steps.length - 1].done = true;
+            }
+            // 添加新进度
+            steps.push({ msg: progressMsg, done: false });
+            messageElement.progressSteps = steps;
+
+            renderProgressList(contentEl, steps);
+            scrollToBottom();
+        }
+
+        // 标记最后一个进度为已完成
+        function markAllProgressDone(messageElement) {
+            const contentEl = messageElement.querySelector('.message-content');
+            if (!contentEl) return;
+            const steps = messageElement.progressSteps || [];
+            if (steps.length > 0) {
+                steps[steps.length - 1].done = true;
+                messageElement.progressSteps = steps;
+                renderProgressList(contentEl, steps);
+            }
+        }
+
+        // 渲染进度列表（始终插入到正文内容之前）
+        function renderProgressList(contentEl, steps) {
+            let listEl = contentEl.querySelector('.progress-list');
+            if (!listEl) {
+                listEl = document.createElement('div');
+                listEl.className = 'progress-list';
+            }
+            listEl.innerHTML = steps.map(step => `
+                <div class="progress-item ${step.done ? 'done' : 'active'}">
+                    <span class="progress-icon">${step.done ? '✓' : '<div class="progress-spinner"></div>'}</span>
+                    <span>${escapeHtml(step.msg)}</span>
+                </div>
+            `).join('');
+
+            // 将进度列表插入到正文 .message-text 之前，确保正文输出在进度下方
+            const textEl = contentEl.querySelector('.message-text');
+            if (textEl) {
+                contentEl.insertBefore(listEl, textEl);
+            } else {
+                contentEl.appendChild(listEl);
+            }
+        }
+
+        // 移除进度状态（兼容性保留，当前主流程已不再调用）
+        function removeProgressStatus(messageElement) {
+            const progressEl = messageElement.querySelector('.progress-list');
+            if (progressEl) {
+                progressEl.remove();
+            }
+        }
+
+        // 渲染警告消息
+        function renderWarnMessage(messageElement, warnText) {
+            removeTypingIndicator(messageElement);
+            const contentEl = messageElement.querySelector('.message-content');
+            if (!contentEl) return;
+            const textEl = contentEl.querySelector('.message-text');
+            if (textEl) {
+                textEl.innerHTML = `<div class="warn-message"><span class="warn-icon">!</span><span>${escapeHtml(warnText)}</span></div>`;
+            }
+            scrollToBottom();
+        }
+
+        // 渲染卡片提示文字
+        function renderCardPrompt(messageElement, promptText) {
+            removeTypingIndicator(messageElement);
+            const contentEl = messageElement.querySelector('.message-content');
+            if (!contentEl) return;
+            const textEl = contentEl.querySelector('.message-text');
+            if (textEl) {
+                textEl.innerHTML = `<div class="card-prompt">${escapeHtml(promptText)}</div>`;
+            }
+            scrollToBottom();
+        }
+
+        // HTML 属性转义（用于 onclick 等属性中的字符串值）
+        function escapeAttr(text) {
+            if (!text) return '';
+            return String(text).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        // 重置聊天区域
+        function resetChat() {
+            messagesContainer.innerHTML = `
+                <div class="welcome-message" id="welcomeMessage">
+                    <h2>欢迎使用 AI 对话助手</h2>
+                    <p>输入您的问题，开始与 AI 交流吧！</p>
+                </div>
+            `;
+            chatHeader.style.display = 'none';
+            chatTitle.textContent = '新对话';
+            conversationIdDisplay.textContent = '';
+        }
+
+        // 删除会话
+        async function deleteConversation(event, conversationId) {
+            event.stopPropagation();
+            
+            if (!confirm('确定要删除这个对话吗？')) return;
+
+            try {
+                const response = await fetch(`/chat/conversation/delete?conversationId=${encodeURIComponent(conversationId)}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (!result.success) {
+                        alert(result.message || '删除失败');
+                        return;
+                    }
+                    loadConversations();
+                    if (currentConversationId === conversationId) {
+                        currentConversationId = null;
+                        resetChat();
+                    }
+                }
+            } catch (error) {
+                console.error('删除会话失败:', error);
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 验证UUID格式
+        function isValidUUID(str) {
+            if (!str || typeof str !== 'string') return false;
+            // UUID格式：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+            const uuidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+            // 也支持32字符的无连字符UUID
+            const uuidPatternNoDash = /^[a-f0-9]{32}$/i;
+            return uuidPattern.test(str) || uuidPatternNoDash.test(str);
+        }
+
+        // 格式化时间
+        function formatTime(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) return '刚刚';
+            if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+            if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
+            
+            return date.toLocaleDateString();
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

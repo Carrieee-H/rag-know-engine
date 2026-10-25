@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+.idea/
+data/corpus/
+data/eval/uploads/
+blobs/
+# Sample documents and evaluation sets come from a paid course; keep them local only.
+data/testFile/
+data/eval/

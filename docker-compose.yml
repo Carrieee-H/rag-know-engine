@@ -1,0 +1,69 @@
+# Local infrastructure for know-engine: PostgreSQL, Elasticsearch (+IK) and MinIO.
+# Usage: cp .env.example .env && docker compose up -d
+#
+# Images avoid Docker Hub, which is unreachable from this machine's Docker VM:
+# Postgres comes from AWS ECR's mirror of the official image, and MinIO from Chainguard
+# (MinIO no longer publishes community images to Docker Hub).
+name: know-engine
+
+services:
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:16
+    environment:
+      POSTGRES_USER: ${PG_USER:-know_engine}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-know_engine}
+      POSTGRES_DB: ${PG_DB:-know_engine}
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-know_engine} -d ${PG_DB:-know_engine}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  elasticsearch:
+    build:
+      context: ./docker/elasticsearch
+      args:
+        ES_VERSION: ${ES_VERSION:-8.15.3}
+    image: know-engine-es-ik:${ES_VERSION:-8.15.3}
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"  # local development only
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "${ES_PORT:-9200}:9200"
+    depends_on:
+      minio:
+        condition: service_healthy  # the IK domain dictionary is served from MinIO
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest  # entrypoint is the minio binary
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"   # S3 API
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"  # web console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]  # image has no curl
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pg_data:
+  es_data:
+  minio_data:

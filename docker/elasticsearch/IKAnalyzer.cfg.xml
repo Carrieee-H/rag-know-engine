@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+	<comment>IK Analyzer 扩展配置</comment>
+	<entry key="ext_dict"></entry>
+	<entry key="ext_stopwords"></entry>
+	<!-- Domain dictionary published to MinIO by know_engine.ingest.dictionary (ik/ is the only
+	     anonymously readable prefix). MinIO is on the same Docker network and starts first, so
+	     ES never waits on the API. IK polls about once a minute and reloads on a new ETag. -->
+	<entry key="remote_ext_dict">http://minio:9000/know-engine/ik/domain.dic</entry>
+</properties>

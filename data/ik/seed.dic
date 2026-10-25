@@ -1,0 +1,19 @@
+# Hand-reviewed domain words that IK splits badly; each one occurs in the sample documents.
+# Team and asset names are added automatically from the tables (see ingest/dictionary.py).
+曙光智造园区
+智造园区
+智造
+复盘
+质量抽样
+维护窗口
+安全联锁
+事件队列
+规则计算
+当班经理
+时间服务器
+采集进程
+值班员
+应急协调组
+蓝鹭应急协调组
+数据平台组
+边缘网关
